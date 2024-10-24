@@ -35,24 +35,42 @@ pool
   });
 
 app.post("/signup", async (req, res) => {
-  console.log(req.body);
   const { email, motdepasse, nom, prenom, codepostal, ville } = req.body;
-  console.log(email);
+
+  if (!email || !motdepasse || !nom || !prenom || !codepostal || !ville) {
+    return res.status(400).send("Tous les champs sont requis");
+  }
 
   try {
     const conn = await pool.getConnection();
     const result = await conn.query(
-      "INSERT INTO Users (email, motdepasse, nom, prenom, codepostal, ville) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT INTO users (email, motdepasse, nom, prenom, codepostal, ville) VALUES (?, ?, ?, ?, ?, ?)",
       [email, motdepasse, nom, prenom, codepostal, ville]
     );
     conn.release();
-    throw new Error("Erreur");
-    res.status(200).send(result);
+
+    // Convertir les BigInt en chaîne avant de les envoyer dans la réponse
+    const resultStringify = JSON.parse(
+      JSON.stringify(result, (key, value) =>
+        typeof value === "bigint" ? value.toString() : value
+      )
+    );
+
+    res
+      .status(200)
+      .json({
+        message: "Utilisateur créé avec succès",
+        result: resultStringify,
+      });
   } catch (err) {
-    res.status(500).send(err);
-    console.error(err);
+    console.error("Erreur lors de l'inscription:", err);
+    res.status(500).send("Erreur interne du serveur");
   }
 });
+
+///////////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////
 
 app.listen(port, () => {
   console.log("Server started on port " + port);
