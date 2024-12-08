@@ -121,14 +121,17 @@ app.post("/login", async (req, res) => {
   }
 });
 
-app.get("/verif/token", (req, res) => {
-  const token = req.headers["token"];
+app.post("/verify-token", (req, res) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1]; // Récupérer le token après "Bearer"
+
+  console.log("Token reçu :", token);
 
   if (!token) {
     return res.status(403).send("Un jeton est requis");
   }
 
-  jwt.verify(token, procces.env.JWT_SECRET, (err, decoded) => {
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) {
       return res.status(401).send("Jeton invalide");
     }
