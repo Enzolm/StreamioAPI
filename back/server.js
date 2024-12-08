@@ -1,19 +1,17 @@
 const express = require("express");
 const mariadb = require("mariadb");
 const cors = require("cors");
+const bcrypt = require("bcrypt"); // Pour hasher le mot de passe
+const jwt = require("jsonwebtoken"); // Pour générer le token JWT
+require("dotenv").config();
 
 const app = express();
 const port = 3000;
 
 app.use(cors());
-
-app.get("/", (req, res) => {});
-
 app.use(express.json());
 
-//connexion à la BDD
-require("dotenv").config();
-
+// Connexion à la BDD
 const pool = mariadb.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -23,7 +21,7 @@ const pool = mariadb.createPool({
   connectionLimit: process.env.DB_CONNECTION_LIMIT,
 });
 
-//test de la connexion
+// Test de la connexion
 pool
   .getConnection()
   .then((conn) => {
@@ -34,6 +32,7 @@ pool
     console.error("Error connecting to database", err);
   });
 
+// Route d'inscription
 app.post("/signup", async (req, res) => {
   const { email, motdepasse, nom, prenom, codepostal, ville } = req.body;
 
@@ -43,35 +42,197 @@ app.post("/signup", async (req, res) => {
 
   try {
     const conn = await pool.getConnection();
+
+    // Hasher le mot de passe
+    const hashedPassword = await bcrypt.hash(motdepasse, 10);
+
+    // Insérer l'utilisateur avec le mot de passe hashé
     const result = await conn.query(
       "INSERT INTO users (email, motdepasse, nom, prenom, codepostal, ville) VALUES (?, ?, ?, ?, ?, ?)",
-      [email, motdepasse, nom, prenom, codepostal, ville]
+      [email, hashedPassword, nom, prenom, codepostal, ville]
     );
     conn.release();
 
-    // Convertir les BigInt en chaîne avant de les envoyer dans la réponse
-    const resultStringify = JSON.parse(
-      JSON.stringify(result, (key, value) =>
-        typeof value === "bigint" ? value.toString() : value
-      )
+    // Générer un token JWT
+    const token = jwt.sign(
+      { email, nom, prenom }, // Payload
+      process.env.JWT_SECRET, // Clé secrète
+      { expiresIn: "1h" } // Expiration du token
     );
 
-    res
-      .status(200)
-      .json({
-        message: "Utilisateur créé avec succès",
-        result: resultStringify,
-      });
+    res.status(200).json({
+      message: "Utilisateur créé avec succès",
+      token, // Envoyer le token au client
+    });
   } catch (err) {
     console.error("Erreur lors de l'inscription:", err);
     res.status(500).send("Erreur interne du serveur");
   }
 });
 
-///////////////////////////////////////////////////////////////////////////////////
+//login
+app.post("/login", async (req, res) => {
+  const { email, motdepasse } = req.body;
 
-///////////////////////////////////////////////////////////////////////////////
+  if (!email || !motdepasse) {
+    return res.status(400).send("Tous les champs sont requis");
+  }
 
+  try {
+    const conn = await pool.getConnection();
+
+    // Récupérer l'utilisateur avec cet email
+    const result = await conn.query("SELECT * FROM users WHERE email = ?", [
+      email,
+    ]);
+
+    if (result.length === 0) {
+      return res.status(404).send("Utilisateur non trouvé");
+    }
+
+    const user = result[0];
+
+    // Vérifier le mot de passe
+    const passwordMatch = await bcrypt.compare(motdepasse, user.motdepasse);
+
+    if (!passwordMatch) {
+      return res.status(401).send("Mot de passe incorrect");
+    }
+
+    // Générer un token JWT
+    const token = jwt.sign(
+      {
+        email: user.email,
+        nom: user.nom,
+        prenom: user.prenom,
+        admin: user.admin,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    res.status(200).json({
+      message: "Connexion réussie",
+      token,
+    });
+  } catch (err) {
+    console.error("Erreur lors de la connexion:", err);
+    res.status(500).send("Erreur interne du serveur");
+  }
+});
+
+app.get("/verif/token", (req, res) => {
+  const token = req.headers["token"];
+
+  if (!token) {
+    return res.status(403).send("Un jeton est requis");
+  }
+
+  jwt.verify(token, procces.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).send("Jeton invalide");
+    }
+
+    res.json({ message: "Ceci est une route protégée", user: decoded });
+  });
+});
+
+//get user
+
+app.get("/get/user", async (req, res) => {
+  const email = "lemaireenzo91@gmail.com";
+
+  if (!email) {
+    return res.status(400).send("L'email est requis");
+  }
+
+  try {
+    const conn = await pool.getConnection();
+
+    // Récupérer l'utilisateur avec cet email
+    const result = await conn.query("SELECT * FROM users WHERE email = ?", [
+      email,
+    ]);
+
+    if (result.length === 0) {
+      return res.status(404).send("Utilisateur non trouvé");
+    }
+
+    const user = result[0];
+
+    res.status(200).json(user);
+  } catch (err) {
+    console.error("Erreur lors de la récupération de l'utilisateur:", err);
+    res.status(500).send("Erreur interne du serveur");
+  }
+});
+
+//update user
+app.put("/update/user", async (req, res) => {
+  console.log(req.body);
+  const { email, motdepasse, nom, prenom, codepostal, ville } = req.body;
+
+  if (!email || !motdepasse || !nom || !prenom || !codepostal || !ville) {
+    return res.status(400).send("Tous les champs sont requis");
+  }
+
+  try {
+    const conn = await pool.getConnection();
+
+    // Hasher le mot de passe
+    const hashedPassword = await bcrypt.hash(motdepasse, 10);
+
+    // Insérer l'utilisateur avec le mot de passe hashé
+    const result = await conn.query(
+      "UPDATE users SET email = ?, motdepasse = ?, nom = ?, prenom = ?, codepostal = ?, ville = ? WHERE email = 'lemaireenzo91@gmail.com'",
+      [email, hashedPassword, nom, prenom, codepostal, ville]
+    );
+    conn.release();
+
+    // Générer un token JWT
+    const token = jwt.sign(
+      { email, nom, prenom }, // Payload
+      process.env.JWT_SECRET, // Clé secrète
+      { expiresIn: "1h" } // Expiration du token
+    );
+
+    res.status(200).json({
+      message: "Utilisateur modifié avec succès",
+      token, // Envoyer le token au client
+    });
+  } catch (err) {
+    console.error("Erreur lors de la modification:", err);
+    res.status(500).send("Erreur interne du serveur");
+  }
+});
+
+app.delete("/delete/user", async (req, res) => {
+  const email = "lemaireenzo91@gmail.com";
+
+  if (!email) {
+    return res.status(400).send("L'email est requis");
+  }
+
+  try {
+    const conn = await pool.getConnection();
+
+    // Récupérer l'utilisateur avec cet email
+    const result = await conn.query("DELETE FROM users WHERE email = ?", [
+      email,
+    ]);
+
+    if (result.length === 0) {
+      return res.status(404).send("Utilisateur non trouvé");
+    }
+
+    res.status(200).json({ message: "Utilisateur supprimé" });
+  } catch (err) {
+    console.error("Erreur lors de la suppression de l'utilisateur:", err);
+    res.status(500).send("Erreur interne du serveur");
+  }
+});
+
+// Lancement du serveur
 app.listen(port, () => {
   console.log("Server started on port " + port);
 });
