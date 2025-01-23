@@ -105,7 +105,7 @@ app.post("/login", async (req, res) => {
         email: user.email,
         nom: user.nom,
         prenom: user.prenom,
-        admin: user.admin,
+        isAdmin: user.admin,
       },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
@@ -233,6 +233,111 @@ app.delete("/delete/user", async (req, res) => {
     console.error("Erreur lors de la suppression de l'utilisateur:", err);
     res.status(500).send("Erreur interne du serveur");
   }
+});
+
+app.post("/create/service", async (req, res) => {
+  const { service_titre, service_description, categorie } = req.body;
+
+  try {
+    const conn = await pool.getConnection();
+
+    // Insérer le service
+    const result = await conn.query(
+      "INSERT INTO service (Nom, description, Photo) VALUES (?, ?, ?)",
+      [service_titre, service_description, categorie]
+    );
+    conn.release();
+
+    res.status(200).json({
+      message: "Service créé avec succès",
+    });
+  } catch (err) {
+    console.error("Erreur lors de la création du service:", err);
+    res.status(500).send("Erreur interne du serveur");
+  }
+});
+
+app.post("/create/service", async (req, res) => {
+  const { service_titre, service_description, service_categorie } = req.body;
+
+  if (!service_titre || !service_description || !categorie) {
+    return res.status(400).send("Tous les champs sont requis");
+  }
+
+  try {
+    const conn = await pool.getConnection();
+
+    const result = await conn.query(
+      "INSERT INTO service (Nom, description, Photo) VALUES (?, ?, ?)",
+      [service_titre, service_description, service_categorie]
+    );
+    conn.release();
+
+    res.status(200).json({
+      message: "Service créé avec succès",
+    });
+  } catch (err) {
+    console.error("Erreur lors de la création du service:", err);
+    res.status(500).send("Erreur interne du serveur");
+  }
+});
+
+app.get("/get/services", async (req, res) => {
+  const { orderBy } = req.query;
+
+  try {
+    const conn = await pool.getConnection();
+
+    let query = "SELECT * FROM service";
+
+    if (orderBy) {
+      query += ` ORDER BY ${orderBy}`;
+    }
+
+    const result = await conn.query(query);
+
+    res.status(200).json(result);
+  } catch (err) {
+    console.error("Erreur lors de la récupération des services:", err);
+    res.status(500).send("Erreur interne du serveur");
+  }
+});
+
+app.delete("/delete/service/:id", async (req, res) => {
+  const { id } = req.params;
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (!token) {
+    return res.status(403).send("Un jeton est requis");
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
+    if (err) {
+      return res.status(401).send("Jeton invalide");
+    }
+
+    if (!decoded.isAdmin) {
+      return res
+        .status(403)
+        .send("Accès interdit, vous devez être administrateur");
+    }
+
+    try {
+      const conn = await pool.getConnection();
+      const result = await conn.query("DELETE FROM service WHERE id = ?", [id]);
+      conn.release();
+
+      if (result.affectedRows === 0) {
+        return res.status(404).send("Service non trouvé");
+      }
+
+      res.status(200).json({ message: "Service supprimé avec succès" });
+    } catch (err) {
+      console.error("Erreur lors de la suppression du service:", err);
+      res.status(500).send("Erreur interne du serveur");
+    }
+  });
 });
 
 // Lancement du serveur
