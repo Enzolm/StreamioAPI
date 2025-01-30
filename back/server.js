@@ -47,10 +47,7 @@ app.post("/signup", async (req, res) => {
     const hashedPassword = await bcrypt.hash(motdepasse, 10);
 
     // Insérer l'utilisateur avec le mot de passe hashé
-    const result = await conn.query(
-      "INSERT INTO users (email, motdepasse, nom, prenom, codepostal, ville) VALUES (?, ?, ?, ?, ?, ?)",
-      [email, hashedPassword, nom, prenom, codepostal, ville]
-    );
+    const result = await conn.query("INSERT INTO users (email, motdepasse, nom, prenom, codepostal, ville) VALUES (?, ?, ?, ?, ?, ?)", [email, hashedPassword, nom, prenom, codepostal, ville]);
     conn.release();
 
     // Générer un token JWT
@@ -82,9 +79,7 @@ app.post("/login", async (req, res) => {
     const conn = await pool.getConnection();
 
     // Récupérer l'utilisateur avec cet email
-    const result = await conn.query("SELECT * FROM users WHERE email = ?", [
-      email,
-    ]);
+    const result = await conn.query("SELECT * FROM users WHERE email = ?", [email]);
 
     if (result.length === 0) {
       return res.status(404).send("Utilisateur non trouvé");
@@ -153,9 +148,7 @@ app.get("/get/user", async (req, res) => {
     const conn = await pool.getConnection();
 
     // Récupérer l'utilisateur avec cet email
-    const result = await conn.query("SELECT * FROM users WHERE email = ?", [
-      email,
-    ]);
+    const result = await conn.query("SELECT * FROM users WHERE email = ?", [email]);
 
     if (result.length === 0) {
       return res.status(404).send("Utilisateur non trouvé");
@@ -186,10 +179,7 @@ app.put("/update/user", async (req, res) => {
     const hashedPassword = await bcrypt.hash(motdepasse, 10);
 
     // Insérer l'utilisateur avec le mot de passe hashé
-    const result = await conn.query(
-      "UPDATE users SET email = ?, motdepasse = ?, nom = ?, prenom = ?, codepostal = ?, ville = ? WHERE email = 'lemaireenzo91@gmail.com'",
-      [email, hashedPassword, nom, prenom, codepostal, ville]
-    );
+    const result = await conn.query("UPDATE users SET email = ?, motdepasse = ?, nom = ?, prenom = ?, codepostal = ?, ville = ? WHERE email = 'lemaireenzo91@gmail.com'", [email, hashedPassword, nom, prenom, codepostal, ville]);
     conn.release();
 
     // Générer un token JWT
@@ -220,9 +210,7 @@ app.delete("/delete/user", async (req, res) => {
     const conn = await pool.getConnection();
 
     // Récupérer l'utilisateur avec cet email
-    const result = await conn.query("DELETE FROM users WHERE email = ?", [
-      email,
-    ]);
+    const result = await conn.query("DELETE FROM users WHERE email = ?", [email]);
 
     if (result.length === 0) {
       return res.status(404).send("Utilisateur non trouvé");
@@ -242,10 +230,7 @@ app.post("/create/service", async (req, res) => {
     const conn = await pool.getConnection();
 
     // Insérer le service
-    const result = await conn.query(
-      "INSERT INTO service (Nom, description, Photo) VALUES (?, ?, ?)",
-      [service_titre, service_description, categorie]
-    );
+    const result = await conn.query("INSERT INTO service (Nom, description, Photo) VALUES (?, ?, ?)", [service_titre, service_description, categorie]);
     conn.release();
 
     res.status(200).json({
@@ -267,10 +252,7 @@ app.post("/create/service", async (req, res) => {
   try {
     const conn = await pool.getConnection();
 
-    const result = await conn.query(
-      "INSERT INTO service (Nom, description, Photo) VALUES (?, ?, ?)",
-      [service_titre, service_description, service_categorie]
-    );
+    const result = await conn.query("INSERT INTO service (Nom, description, Photo) VALUES (?, ?, ?)", [service_titre, service_description, service_categorie]);
     conn.release();
 
     res.status(200).json({
@@ -307,7 +289,6 @@ app.delete("/delete/service/:id", async (req, res) => {
   const { id } = req.params;
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
-
   if (!token) {
     return res.status(403).send("Un jeton est requis");
   }
@@ -318,9 +299,7 @@ app.delete("/delete/service/:id", async (req, res) => {
     }
 
     if (!decoded.isAdmin) {
-      return res
-        .status(403)
-        .send("Accès interdit, vous devez être administrateur");
+      return res.status(403).send("Accès interdit, vous devez être administrateur");
     }
 
     try {
