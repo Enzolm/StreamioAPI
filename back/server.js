@@ -123,18 +123,24 @@ app.post("/verify-token", (req, res) => {
   console.log("Token reçu :", token);
 
   if (!token) {
-    return res.status(403).send("Un jeton est requis");
+    return res.status(403).json({ message: "Un jeton est requis" });
   }
 
   jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) {
-      return res.status(401).send("Jeton invalide");
+      return res.status(401).json({ message: "Jeton invalide" });
     }
 
-    res.json({ message: "Ceci est une route protégée", user: decoded });
+    // Vérifier si l'utilisateur est admin
+    const isAdmin = decoded.isAdmin || false;
+
+    res.json({
+      message: "Jeton valide",
+      user: decoded,
+      isAdmin: isAdmin, // Indiquer si l'utilisateur est admin
+    });
   });
 });
-
 //get user
 
 app.get("/get/user", async (req, res) => {
