@@ -184,20 +184,44 @@ app.get("/get/services", async (req, res) => {
   }
 });
 
+app.post("/create/service", authenticateToken, async (req, res) => {
+  const { Nom, categorie, description, Prix, Photo, Video } = req.body;
+
+  if (!Nom || !categorie || !description) {
+    return res.status(400).json({ message: "Tous les champs obligatoires doivent être remplis" });
+  }
+
+  try {
+    const conn = await pool.getConnection();
+    const sql = "INSERT INTO service (Nom, categorie, description, Prix, Photo, Video) VALUES (?, ?, ?, ?, ?, ?)";
+    await conn.query(sql, [Nom, categorie, description, Prix, Photo, Video]);
+    conn.release();
+
+    res.status(201).json({ message: "Service ajouté avec succès" });
+  } catch (error) {
+    console.error("Erreur lors de l'ajout du service:", error);
+    res.status(400).json({ message: "Erreur lors de l'ajout du service" });
+  }
+});
+
 // Route pour mettre à jour un service
 app.put("/update/service/:id", authenticateToken, async (req, res) => {
-  const { service_titre, service_description, categorie } = req.body;
+  const { service_titre, service_description, categorie, photo } = req.body;
   const serviceId = req.params.id;
 
+  // Vérifiez si tous les champs nécessaires sont présents
   if (!service_titre || !service_description || !categorie) {
     return res.status(400).send("Tous les champs sont requis");
   }
 
   try {
     const conn = await pool.getConnection();
-    const result = await conn.query("UPDATE service SET Nom = ?, description = ?, Photo = ? WHERE Id_service = ?", [service_titre, service_description, categorie, serviceId]);
+
+    // Si vous voulez mettre à jour Photo, vous devez ajouter ce paramètre dans la requête SQL
+    const result = await conn.query("UPDATE service SET Nom = ?, description = ?, categorie = ?, Photo = ? WHERE Id_service = ?", [service_titre, service_description, categorie, photo || "", serviceId]);
     conn.release();
 
+    // Vérifiez si des lignes ont été affectées
     if (result.affectedRows === 0) {
       return res.status(404).send("Service non trouvé");
     }
