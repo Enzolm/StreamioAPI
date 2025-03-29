@@ -170,12 +170,19 @@ app.delete("/delete/service/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// Route pour récupérer tous les services
 app.get("/get/services", async (req, res) => {
+  const { orderBy } = req.query;
+
   try {
     const conn = await pool.getConnection();
-    const result = await conn.query("SELECT * FROM service");
-    conn.release();
+
+    let query = "SELECT * FROM service";
+
+    if (orderBy) {
+      query += ` ORDER BY ${orderBy}`;
+    }
+
+    const result = await conn.query(query);
 
     res.status(200).json(result);
   } catch (err) {
@@ -204,7 +211,6 @@ app.post("/create/service", authenticateToken, async (req, res) => {
   }
 });
 
-// Route pour mettre à jour un service
 app.put("/update/service/:id", authenticateToken, async (req, res) => {
   const { service_titre, service_description, categorie, photo } = req.body;
   const serviceId = req.params.id;
@@ -233,7 +239,94 @@ app.put("/update/service/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// Démarrer le serveur
+app.get("/taches/active", async (req, res) => {
+  try {
+    const conn = await pool.getConnection();
+    const result = await conn.query('SELECT * FROM todo WHERE statut = "en cours"');
+    conn.release();
+    res.status(200).json(result);
+  } catch (err) {
+    console.error("Erreur lors de la récupération des commandes en cours:", err);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+});
+
+app.get("/taches/terminer", async (req, res) => {
+  try {
+    const conn = await pool.getConnection();
+    const result = await conn.query('SELECT * FROM todo WHERE statut = "terminer"');
+    conn.release();
+    res.status(200).json(result);
+  } catch (err) {
+    console.error("Erreur lors de la récupération des commandes terminées:", err);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+});
+
+app.get("/taches/search", async (req, res) => {
+  const searchTerm = req.query.searchTerm || "";
+  try {
+    const conn = await pool.getConnection();
+    const query = `SELECT * FROM todo WHERE titre LIKE ? OR statut LIKE ?`;
+    const result = await conn.query(query, [`%${searchTerm}%`, `%${searchTerm}%`]);
+    conn.release();
+    res.status(200).json(result);
+  } catch (err) {
+    console.error("Erreur lors de la recherche des commandes:", err);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+});
+
+app.get("/get/users", async (req, res) => {
+  try {
+    const conn = await pool.getConnection();
+    const result = await conn.query("SELECT * FROM users");
+    conn.release();
+    res.status(200).json(result);
+  } catch (err) {
+    console.error("Erreur lors de la récupération des utilisateurs:", err);
+    res.status(500).send("Erreur interne du serveur");
+  }
+});
+
+app.post("/create/users", async (req, res) => {
+  const { email, nom, prenom } = req.body;
+  console.log(req.body, email, nom, prenom);
+  const adminCreation = 1;
+  if (!email || !nom || !prenom) {
+    return res.status(400).send("Tous les champs sont requis", adminCreation, email, nom, prenom);
+  }
+
+  try {
+    const conn = await pool.getConnection();
+
+    await conn.query("INSERT INTO users (email, nom, prenom, admin_creation) VALUES (?, ?, ?, ?)", [email, nom, prenom, adminCreation]);
+    conn.release();
+
+    // const token = jwt.sign({ email, nom, prenom }, process.env.JWT_SECRET, { expiresIn: "1h" });
+
+    res.status(201).json({ message: "Utilisateur créé avec succès" });
+  } catch (err) {
+    console.error("Erreur lors de l'inscription:", err);
+    res.status(500).send("Erreur interne du serveur");
+  }
+});
+
+app.delete("/delete/user/:id", async (req, res) => {
+  try {
+    const conn = await pool.getConnection();
+    const result = await conn.query("DELETE FROM users WHERE id = ?", [req.params.id]);
+    conn.release();
+
+    if (result.affectedRows === 0) return res.status(404).send("Utilisateur non trouvé");
+
+    res.status(200).json({ message: "Utilisateur supprimé avec succès" });
+  } catch (err) {
+    console.error("Erreur lors de la suppression de l'utilisateur:", err);
+    res.status(500).send("Erreur interne du serveur");
+  }
+});
+
 app.listen(port, () => {
   console.log(`Serveur démarré sur le port ${port}`);
 });
