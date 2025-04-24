@@ -41,6 +41,7 @@ const authenticateToken = (req, res, next) => {
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) return res.status(401).send("Jeton invalide");
     req.user = user;
+    console.log("Utilisateur authentifié:", user);
     next();
   });
 };
@@ -99,7 +100,8 @@ app.post("/login", async (req, res) => {
 
     if (!passwordMatch) return res.status(401).send("Mot de passe incorrect");
 
-    const token = jwt.sign({ email: user.email, nom: user.nom, prenom: user.prenom, isAdmin: user.admin }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    console.log("Utilisateur connecté:", user.isEmployee);
+    const token = jwt.sign({ email: user.email, nom: user.nom, prenom: user.prenom, isAdmin: user.admin, isEmployee: user.isEmployee }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
     res.status(200).json({ message: "Connexion réussie", token });
   } catch (err) {
@@ -343,6 +345,63 @@ app.delete("/delete/user/:id", async (req, res) => {
   } catch (err) {
     console.error("Erreur lors de la suppression de l'utilisateur:", err);
     res.status(500).send("Erreur interne du serveur");
+  } finally {
+    if (conn) conn.release();
+  }
+});
+app.get("/taches/search", authenticateToken, async (req, res) => {
+  const searchTerm = req.query.searchTerm || "";
+  const order = req.query.order || "ASC";
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const query = `
+      SELECT * FROM todo
+      WHERE titre LIKE ? OR statut LIKE ?
+      ORDER BY titre ${order === "DESC" ? "DESC" : "ASC"}
+    `;
+    const result = await conn.query(query, [`%${searchTerm}%`, `%${searchTerm}%`]);
+    res.status(200).json(result);
+  } catch (err) {
+    console.error("Erreur lors de la recherche des commandes:", err);
+    res.status(500).json({ message: "Erreur serveur" });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+app.delete("/delete/taches/:id", async (req, res) => {
+  const { id } = req.params; // Récupère l'ID de la commande passé dans l'URL
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    // Effectuer la suppression dans la base de données en utilisant l'ID
+    const result = await conn.query("DELETE FROM todo WHERE id = ?", [id]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).send("Commande non trouvée"); // Si aucune ligne n'a été affectée, la commande n'existe pas
+    }
+
+    res.status(200).json({ message: "Commande supprimée avec succès" }); // Si la commande a été supprimée
+  } catch (err) {
+    console.error("Erreur lors de la suppression de la commande:", err);
+    res.status(500).send("Erreur interne du serveur"); // Gérer les erreurs du serveur
+  } finally {
+    if (conn) conn.release(); // Libérer la connexion à la base de données
+  }
+});
+
+app.get("/get/employee", async (req, res) => {
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const result = await conn.query("SELECT * FROM users WHERE isEmployee = 1");
+    res.status(200).json(result);
+  } catch (err) {
+    console.error("Erreur lors de la récupération des employés : ", err);
+    res.status(500).json({ message: "Erreur serveur" });
   } finally {
     if (conn) conn.release();
   }
